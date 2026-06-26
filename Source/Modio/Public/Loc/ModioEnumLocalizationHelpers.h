@@ -14,10 +14,25 @@
 
 namespace ModioUI
 {
-	template<typename EnumType>
-	void RegisterEnumAsLocalizable(FStringTableRef TargetTable)
+	// FStringTable::SetSourceString takes a mandatory dev-notes argument under WITH_EDITORONLY_DATA (UE 5.8),
+	// but only the two-argument form in non-editor builds. Wrap both so callers don't need to branch.
+	inline void SetEnumSourceString(FStringTableRef TargetTable, const FTextKey& Key, const FString& SourceString)
 	{
-		UEnum* EnumReflectionData = StaticEnum<EnumType>();
+#if WITH_EDITORONLY_DATA
+		TargetTable->SetSourceString(Key, SourceString, FString());
+#else
+		TargetTable->SetSourceString(Key, SourceString);
+#endif
+	}
+
+	// UE 5.8 only generates StaticEnum<T>() for `enum class` types, so this UEnum*-taking overload allows
+	// callers to register reflected `enum`s (resolved at runtime) that don't have a StaticEnum<> accessor.
+	inline void RegisterEnumAsLocalizable(FStringTableRef TargetTable, const UEnum* EnumReflectionData)
+	{
+		if (EnumReflectionData == nullptr)
+		{
+			return;
+		}
 
 		int32 NumEnumEntries = EnumReflectionData->NumEnums() - 1; // Don't count the automatically added _MAX entry
 		for (int32 CurrentEntryIndex = 0; CurrentEntryIndex < NumEnumEntries; CurrentEntryIndex++)
@@ -25,8 +40,14 @@ namespace ModioUI
 			FName NameStr = EnumReflectionData->GetNameByIndex(CurrentEntryIndex);
 
 			FText DisplayString = EnumReflectionData->GetDisplayNameTextByIndex(CurrentEntryIndex);
-			TargetTable->SetSourceString(NameStr.ToString(), DisplayString.ToString());
+			SetEnumSourceString(TargetTable, NameStr.ToString(), DisplayString.ToString());
 		}
+	}
+
+	template<typename EnumType>
+	void RegisterEnumAsLocalizable(FStringTableRef TargetTable)
+	{
+		RegisterEnumAsLocalizable(TargetTable, StaticEnum<EnumType>());
 	}
 	template<typename EnumType>
 	void RegisterCustomEnumValueLocalization(FStringTableRef TargetTable, EnumType EnumValue, FString SourceString)
@@ -34,7 +55,7 @@ namespace ModioUI
 		UEnum* EnumReflectionData = StaticEnum<EnumType>();
 
 		FName EnumEntryNameStr = EnumReflectionData->GetNameByValue(static_cast<int64>(EnumValue));
-		TargetTable->SetSourceString(EnumEntryNameStr.ToString(), SourceString);
+		SetEnumSourceString(TargetTable, EnumEntryNameStr.ToString(), SourceString);
 	}
 } // namespace ModioUI
 
@@ -113,7 +134,7 @@ public:
 			}
 		}
 
-		double InNewUnit = (double) FileSize / static_cast<double>(Unit);
+		double InNewUnit = (double) FileSize / static_cast<double>(static_cast<int64>(Unit));
 
 		FFormatNamedArguments Args;
 
@@ -123,9 +144,18 @@ public:
 		FormatRules.MinimumIntegralDigits = 1;
 
 		Args.Add(TEXT("FileSize"), FText::AsNumber(InNewUnit, &FormatRules));
-		Args.Add(TEXT("UnitName"),
-				 bIncludeUnitName ? GetLocalizedTextForEnumByName(StaticEnum<EFileSizeUnit>()->GetNameByValue(Unit))
-								  : FText::GetEmpty());
+
+		// UE 5.8 removed StaticEnum<>() for non-`enum class` UENUMs, so resolve the reflected enum at runtime.
+		FText UnitName = FText::GetEmpty();
+		if (bIncludeUnitName)
+		{
+			const UEnum* FileSizeUnitEnum = FindObject<UEnum>(nullptr, TEXT("/Script/Modio.EFileSizeUnit"));
+			if (FileSizeUnitEnum != nullptr)
+			{
+				UnitName = GetLocalizedTextForEnumByName(FileSizeUnitEnum->GetNameByValue(Unit));
+			}
+		}
+		Args.Add(TEXT("UnitName"), UnitName);
 
 		return FText::Format(FTextFormat::FromString(TEXT("{FileSize}{UnitName}")), Args);
 	}

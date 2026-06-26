@@ -91,3 +91,6 @@ Doc/latex/*
 
 
 Source/Platforms/*
+
+# mod.io native SDK source generated at build time (MODIO_DEVELOPMENT_MODE); not committed
+Source/ThirdParty/GeneratedNativeSDK/

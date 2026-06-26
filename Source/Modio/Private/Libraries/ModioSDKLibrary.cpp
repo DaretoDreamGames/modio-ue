@@ -78,15 +78,15 @@ static FString ToString(EFileSizeUnit Unit)
 {
 	switch (Unit)
 	{
-		case B:
+		case EFileSizeUnit::B:
 			return TEXT("bytes");
-		case KB:
+		case EFileSizeUnit::KB:
 			return TEXT("KB");
-		case MB:
+		case EFileSizeUnit::MB:
 			return TEXT("MB");
-		case GB:
+		case EFileSizeUnit::GB:
 			return TEXT("GB");
-		case Largest:
+		case EFileSizeUnit::Largest:
 		default:
 			return TEXT("Unknown unit");
 	}
@@ -94,19 +94,19 @@ static FString ToString(EFileSizeUnit Unit)
 
 EFileSizeUnit UModioSDKLibrary::GetDesiredFileSizeUnit_Unsigned64(FModioUnsigned64 FileSize)
 {
-	if (FileSize.Underlying > GB)
+	if (FileSize.Underlying > static_cast<uint64>(EFileSizeUnit::GB))
 	{
-		return GB;
+		return EFileSizeUnit::GB;
 	}
-	if (FileSize.Underlying > MB)
+	if (FileSize.Underlying > static_cast<uint64>(EFileSizeUnit::MB))
 	{
-		return MB;
+		return EFileSizeUnit::MB;
 	}
-	if (FileSize.Underlying > KB)
+	if (FileSize.Underlying > static_cast<uint64>(EFileSizeUnit::KB))
 	{
-		return KB;
+		return EFileSizeUnit::KB;
 	}
-	return B;
+	return EFileSizeUnit::B;
 }
 
 EFileSizeUnit UModioSDKLibrary::GetDesiredFileSizeUnit(int64 FileSize)
@@ -121,12 +121,12 @@ FText UModioSDKLibrary::Filesize_ToString_Unsigned64(FModioUnsigned64 FileSize, 
 	static constexpr int32 MB = 1024 * 1024;
 	static constexpr int32 GB = 1024 * 1024 * 1024;
 
-	if (Unit == Largest)
+	if (Unit == EFileSizeUnit::Largest)
 	{
 		Unit = GetDesiredFileSizeUnit(static_cast<int64_t>(FileSize.Underlying));
 	}
 
-	const double InNewUnit = FileSize / Unit;
+	const double InNewUnit = FileSize / static_cast<double>(static_cast<int64>(Unit));
 
 	FFormatNamedArguments Args;
 
